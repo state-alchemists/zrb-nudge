@@ -51,7 +51,7 @@ jobs:
 
       - name: Lint
         # Pyflakes-class checks only, as zrb does.
-        run: flake8 --select=F zrb_nudge test_nudge.py test_ci.py
+        run: flake8 --select=F zrb_nudge zrb_init.py test_nudge.py test_ci.py
 
       - name: Check the CI configuration
         run: python test_ci.py
