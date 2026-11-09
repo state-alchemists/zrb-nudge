@@ -1,0 +1,60 @@
+name: "Test"
+run-name: "Run tests for ${{ github.actor }}"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  # release.yml calls this at the tag, so the suite guarding main is exactly the
+  # suite guarding a release.
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pinned images, never `-latest` -- test_ci.py enforces it. zrb needs 3.11+.
+        os: [ubuntu-26.04]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          # The command line writes a POSIX shell line and picks a profile from $SHELL,
+          # so one real shell that is not Linux runs the same test.
+          - os: macos-26
+            python-version: "3.13"
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        # zrb stays unpinned on purpose: a new zrb release is allowed to turn this
+        # job red, because that is the question it asks.
+        run: pip install -e ".[zrb]" flake8
+
+      - name: Resolved versions
+        run: pip freeze | grep -Ei '^(zrb|flake8)='
+
+      - name: Lint
+        # Pyflakes-class checks only, as zrb does.
+        run: flake8 --select=F zrb_nudge test_nudge.py test_ci.py
+
+      - name: Check the CI configuration
+        run: python test_ci.py
+
+      - name: Test
+        run: python test_nudge.py

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zrb-nudge"
+version = "0.1.0"
+description = "Scheduled nudges for zrb: a file of reminders, two tools to write it, and a trigger that reads it"
+readme = "README.md"
+# The same licence zrb itself declares, and a file to go with it: the identifier alone
+# leaves PyPI's licence field empty.
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = []  # the file and the CLI are stdlib only; zrb_init.py runs inside zrb
+
+[project.optional-dependencies]
+zrb = ["zrb"]
+
+[project.scripts]
+zrb-nudge = "zrb_nudge.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/state-alchemists/zrb-nudge"
+
+[tool.hatch.build.targets.wheel]
+packages = ["zrb_nudge"]
+
+[tool.hatch.build.targets.sdist]
+include = ["zrb_nudge", "README.md", "LICENSE", "test_nudge.py", "test_ci.py"]
