@@ -80,7 +80,7 @@ zrb reads its own names.
 | `ZRB_NUDGE` | `auto` | `zrb_init.py` | `auto` offers a turn when a moment is due and unsaid; `off` never does. |
 | `ZRB_NUDGE_FILE` | `~/.zrb/nudge.json` | both | The schedule file. |
 | `ZRB_NUDGE_SECONDS` | `60` | `zrb_init.py` | Seconds between looking at the file. Reading it costs nothing, so a due moment arrives within a minute. |
-| `ZRB_NUDGE_PROMPT` | `Say this to the user in your own words, briefly.` | `zrb_init.py` | What the turn asks for, after the reminder itself. An empty value asks for nothing, so the reminder is the whole turn. |
+| `ZRB_NUDGE_PROMPT` | `Before saying anything, check whether the user is at the desk … otherwise reply exactly {nothing_to_say}. Otherwise say this to the user in your own words, briefly.` | `zrb_init.py` | What the turn asks for, after the reminder itself. `{nothing_to_say}` is the one placeholder it reads (`…`); an empty value asks for nothing, so the reminder is the whole turn. |
 | `ZRB_NUDGE_PROFILE` | empty | `zrb-nudge install` | The profile to write, instead of the one this shell reads. |
 
 ## What a nudge turn is
@@ -89,23 +89,31 @@ A due moment becomes a user turn that says so:
 
 ```
 [nudge 12:00, not typed by the user] It is lunchtime and the user is still working.
-Say this to the user in your own words, briefly.
+Before saying anything, check whether the user is at the desk — AvatarStatus answers it
+where zrb-avatar is loaded — and if nobody is there reply exactly … , so nothing is said.
+Otherwise say this to the user in your own words, briefly.
 ```
 
-- It is a normal turn: the model answers it with its tools, its memory and its rules,
-  and may say something short or nothing worth saying.
+- It is a normal turn: the model answers it with its tools, its memory and its rules.
+- **The presence check is the agent's, not this package's.** A reminder is worth saying
+  to somebody; whether somebody is there is a fact only a face can supply. Where
+  [zrb-avatar](https://github.com/state-alchemists/zrb-avatar) is loaded its `AvatarStatus`
+  (and the `face —` line in every turn) answers it, and its speech backend shows `…`
+  without speaking it. Where it is not, the model has nothing to check and simply says
+  the reminder.
 - A turn that starts while another is running is **queued behind it**, not dropped.
 - One moment per look, earliest first: three reminders due at once arrive as three
   turns a minute apart, not one wall of text.
 - The moment is written to `said` **before** the turn starts, so a turn that errors, a
   restart, or two zrb processes on the same file cannot say the same thing twice.
 
-## What it does not know
+## Independence
 
-It knows the clock and the file. It cannot see whether anyone is at the desk, whether
-the camera saw you leave, or whether the last turn failed — those belong to
-[zrb-avatar](https://github.com/state-alchemists/zrb-avatar), whose own nudge keeps
-that half (`ZRB_AVATAR_NUDGE*`). With both loaded, each speaks for what it knows.
+Nothing here imports zrb-avatar, reads its files, or knows it exists; the two packages
+share a convention (`…` for "nothing to say") and a question, not a call. zrb-avatar's
+side of the bargain is presence: it knows whether someone is at the desk and answers
+`AvatarStatus`. So a chat with no face still gets its reminders, and a chat with one gets
+them only when someone is looking.
 
 ## The command line
 

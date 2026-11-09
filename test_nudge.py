@@ -8,6 +8,7 @@ writes its one line to a profile and takes it away again.
 import asyncio
 import datetime
 import json
+import os
 import tempfile
 from pathlib import Path
 
@@ -255,13 +256,23 @@ with tempfile.TemporaryDirectory() as folder:
         assert text == (
             "[nudge 12:00, not typed by the user] m Say this in your own words."
         ), text
+        # {nothing_to_say} is the one placeholder it reads: a white label can name its own
+        # silence, and the default one is the ellipsis zrb-avatar shows and does not speak.
+        nudge.PROMPT = "Nobody there? {nothing_to_say}. Else say it."
+        assert nudge._nudge_input(daily, clock(12)).text.endswith(
+            "Nobody there? …. Else say it."
+        )
+        # The shipped instruction asks for the one thing a reminder cannot know by itself.
+        if not os.environ.get(f"{schedule.prefix()}_NUDGE_PROMPT"):
+            assert "at the desk" in saved_prompt, saved_prompt
+            assert "{nothing_to_say}" in saved_prompt, saved_prompt
         nudge.PROMPT = "   "
         assert nudge._nudge_input(daily, clock(12)).text == (
             "[nudge 12:00, not typed by the user] m"
         )
         assert nudge._nudge_input(daily, clock(12)).source.modality == "text"
     finally:
-        nudge.FILE, nudge.PROMPT = saved_file, nudge.PROMPT if False else saved_prompt
+        nudge.FILE, nudge.PROMPT = saved_file, saved_prompt
 
 
 async def _a_due_moment_is_offered():

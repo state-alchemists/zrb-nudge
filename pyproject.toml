@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zrb-nudge"
-version = "0.1.0"
+version = "0.1.1"
 description = "Scheduled nudges for zrb: a file of reminders, two tools to write it, and a trigger that reads it"
 readme = "README.md"
 # The same licence zrb itself declares, and a file to go with it: the identifier alone

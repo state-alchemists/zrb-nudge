@@ -16,9 +16,11 @@ Settings (the prefix follows zrb's CFG.ENV_PREFIX, ZRB by default):
                        what has already been said, in one file people can read
   ZRB_NUDGE_SECONDS    seconds between looking at it (60); reading a file costs
                        nothing, and the moment is due to the minute
-  ZRB_NUDGE_PROMPT     what the turn asks for, after the reminder itself ("Say this
-                       to the user in your own words, briefly."). Empty asks for
-                       nothing, so the reminder is the whole turn
+  ZRB_NUDGE_PROMPT     what the turn asks for, after the reminder itself: check that
+                       someone is at the desk, stay silent when nobody is, otherwise
+                       say it in the agent's own words. {nothing_to_say} is the one
+                       placeholder it reads ("…"). Empty asks for nothing at all, so
+                       the reminder is the whole turn
 """
 
 import asyncio
@@ -51,7 +53,13 @@ from zrb_nudge import schedule  # noqa: E402
 NUDGE = os.getenv(f"{schedule.prefix()}_NUDGE", "auto").strip().lower()  # auto | off
 FILE = schedule.nudge_file()
 SECONDS = float(schedule.setting("SECONDS", "60"))
-PROMPT = schedule.setting("PROMPT", "Say this to the user in your own words, briefly.")
+NOTHING_TO_SAY = "…"
+PROMPT = schedule.setting(
+    "PROMPT",
+    "Before saying anything, check whether the user is at the desk -- AvatarStatus answers it"
+    " where zrb-avatar is loaded -- and if nobody is there reply exactly {nothing_to_say}, so"
+    " nothing is said. Otherwise say this to the user in your own words, briefly.",
+)
 _warned = ""
 
 
@@ -104,8 +112,9 @@ def RemoveSchedule(id: str) -> str:
 def _nudge_input(entry: schedule.Schedule, start: datetime.datetime) -> TriggerInput:
     """The turn a due moment starts: the reminder, then what to do with it."""
     text = f"[nudge {start:%H:%M}, not typed by the user] {entry.message}"
-    if PROMPT.strip():
-        text += f" {PROMPT.strip()}"
+    instruction = PROMPT.replace("{nothing_to_say}", NOTHING_TO_SAY).strip()
+    if instruction:
+        text += f" {instruction}"
     return TriggerInput(
         text=text,
         source=InputProvenance("nudge", modality="text"),
