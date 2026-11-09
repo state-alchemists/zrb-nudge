@@ -11,17 +11,24 @@ on:
 
 jobs:
   review:
-    # Same-repository branches only, since pushing one takes write access. Read the
-    # head's repo rather than author_association, which reports a private org
-    # membership as CONTRIBUTOR.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # Two guards, both about the key. A `pull_request_target` run holds the secrets
+    # whatever the pull request's origin, so the association test is the barrier
+    # that keeps a drive-by pull request from spending tokens, and the head-repo
+    # test keeps fork runs out entirely -- which is also what makes the review's
+    # cost predictable. The head-repo test is the stricter of the two, because
+    # author_association reports a private org membership as CONTRIBUTOR; both are
+    # written out so neither reads as redundant to whoever edits this next.
+    if: >-
+      (github.event.pull_request.author_association == 'OWNER' ||
+       github.event.pull_request.author_association == 'MEMBER' ||
+       github.event.pull_request.author_association == 'COLLABORATOR') &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       contents: read
       pull-requests: write
     env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       ZRB_LLM_MODEL: ${{ secrets.ZRB_LLM_MODEL || vars.ZRB_LLM_MODEL }}
       ZRB_LLM_JOURNAL_ENABLED: "false"
       ZRB_INIT_STRICT: "1"
@@ -38,14 +45,20 @@ jobs:
           python-version: "3.13"
           cache: pip
 
-      - name: Install zrb
-        run: pip install zrb requests
+      # Pinned, in the spirit of zrb's review container: the same diff reviewed twice
+      # runs the same reviewer, not whatever PyPI served that morning. This step holds
+      # no secret -- the key is declared on the step below -- so a compromised package
+      # install finds nothing to read. Transitive dependencies are still whatever PyPI
+      # resolves; hashes would close that too, at the cost of editing them by hand.
+      - name: Install the reviewer
+        run: pip install "zrb==3.37.0" "requests==2.34.2"
 
       # The command is fixed here rather than an `eval` of a workflow input, so no
       # event data can reach a shell that holds the key.
       - name: Review and comment
         shell: bash
         env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           if [ -z "$OPENAI_API_KEY" ]; then
