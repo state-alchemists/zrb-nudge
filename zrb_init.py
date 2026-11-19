@@ -10,8 +10,12 @@ from urllib.parse import urlparse
 
 import requests
 from zrb import AnyContext, CmdTask, LLMTask, StrInput, Tpl, cli, make_task
-from zrb.llm.tool import read_file as read_file_tool
-from zrb.llm.tool import run_shell_command as run_shell_command_tool
+try:  # zrb 4.0 keeps every unit under a layer directory
+    from zrb.llm.capabilities.tool import read_file as read_file_tool
+    from zrb.llm.capabilities.tool import run_shell_command as run_shell_command_tool
+except ImportError:  # zrb < 4.0 keeps the tool unit at the top of zrb.llm
+    from zrb.llm.tool import read_file as read_file_tool
+    from zrb.llm.tool import run_shell_command as run_shell_command_tool
 from zrb.util.file import read_file
 
 git_diff = CmdTask(

@@ -30,15 +30,23 @@ import sys
 
 from zrb import CFG
 from zrb.builtin import llm_chat
-from zrb.llm.tool_call import auto_approve
-from zrb.llm.ui.trigger import TriggerInput
+try:  # zrb 4.0 keeps each unit under a layer directory
+    from zrb.llm.capabilities.tool_call import auto_approve
+    from zrb.llm.presentation.ui.trigger import TriggerInput
+except ImportError:  # zrb < 4.0 keeps both units at the top of zrb.llm
+    from zrb.llm.tool_call import auto_approve
+    from zrb.llm.ui.trigger import TriggerInput
 
-# zrb moved its shared layer-0 leaves into `zrb.llm.shared`, and this plugin declares no
-# minimum zrb: read the layout that is here. The class is the same code in both spots.
+# zrb moved its shared layer-0 leaves into `zrb.llm.shared`, and 4.0 moved them again under
+# `contracts/`; this plugin declares no minimum zrb, so every layout is read, newest first. The
+# class is the same code in all of them.
 try:
-    from zrb.llm.shared.input_source import InputProvenance
-except ImportError:  # a zrb that predates the move keeps it at the top of zrb.llm
-    from zrb.llm.input_source import InputProvenance
+    from zrb.llm.contracts.shared.input_source import InputProvenance
+except ImportError:
+    try:  # zrb 3.4x keeps the shared leaves under their own unit
+        from zrb.llm.shared.input_source import InputProvenance
+    except ImportError:  # anything older keeps it at the top of zrb.llm
+        from zrb.llm.input_source import InputProvenance
 
 # zrb loads this file by path; from a source checkout the package isn't installed.
 # Appended, not prepended: installed, this folder is another venv's site-packages,
