@@ -34,7 +34,16 @@ jobs:
             exit 1
           fi
 
-      - run: gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME"
+      # A release has to be safe to re-run: the publish below may fail after this step has
+      # already run, and `gh release create` refuses a name that is taken -- which would
+      # fail this job and skip the publish that the re-run was for.
+      - name: Open the release unless it is already there
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "$GITHUB_REF_NAME already has a release; leaving it as it is"
+          else
+            gh release create "$GITHUB_REF_NAME" --generate-notes --title "$GITHUB_REF_NAME"
+          fi
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -53,19 +62,38 @@ jobs:
       - run: pip install build
       - run: python -m build
 
-      # A release has to be safe to re-run: a version that is already on PyPI is not an error.
-      - name: Is this version already on PyPI?
-        id: published
+      # A release has to be safe to re-run, and "the version is on PyPI" is not the same
+      # question as "every file is": a publish can fail halfway and leave the version
+      # there with only one of its files. So compare file names, and let the action below
+      # skip the ones already uploaded.
+      - name: Which of these files is PyPI still missing?
+        id: missing
         run: |
-          if curl -fsS "https://pypi.org/pypi/zrb-nudge/$GITHUB_REF_NAME/json" > /dev/null; then
-            echo "yes=true" >> "$GITHUB_OUTPUT"
-            echo "$GITHUB_REF_NAME is already on PyPI; attaching the build to the release instead"
-          else
-            echo "yes=false" >> "$GITHUB_OUTPUT"
-          fi
+          curl -fs "https://pypi.org/pypi/zrb-nudge/$GITHUB_REF_NAME/json" -o /tmp/published.json \
+            || { echo "no file list for $GITHUB_REF_NAME from PyPI; treating every file as unpublished"; echo '{}' > /tmp/published.json; }
+          python3 - <<'PY'
+          import glob, json, os, pathlib
 
-      - if: steps.published.outputs.yes == 'false'
+          published = {
+              entry["filename"]
+              for entry in json.loads(pathlib.Path("/tmp/published.json").read_text()).get("urls", [])
+          }
+          built = sorted(os.path.basename(path) for path in glob.glob("dist/*"))
+          missing = [name for name in built if name not in published]
+          version = os.environ["GITHUB_REF_NAME"]
+          if missing:
+              print(f"{version}: PyPI is missing {', '.join(missing)}")
+          else:
+              print(f"{version} is on PyPI with every file; attaching the build to the release instead")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"any={'yes' if missing else 'no'}\n")
+          PY
+
+      - if: steps.missing.outputs.any == 'yes'
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          # The re-run case: upload the file PyPI lacks, leave the one it has.
+          skip-existing: true
 
       - run: gh release upload "$GITHUB_REF_NAME" dist/* --clobber
         env:
